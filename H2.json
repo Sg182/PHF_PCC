@@ -1,0 +1,23 @@
+{
+    "mol_name":"H2",
+    "do_CC":false,
+    "geom_file":"H2.xyz",
+    "orb_init":"H2_6_31G_orb",
+    "basis":["6-31G","cc-pvdz"],
+    "SP":2,
+    "ngrid":[1,10],
+    "PG":"None",
+    "Irrep":"Ag",
+    "J":0,
+    "M":0,
+    "chkpoint":false,
+    "CmplxConj":0,
+    "unit":"Ang",
+    "read_PHF":false,
+    "read_PCC":false,
+    "refine_PHF":false,
+    "DIIS":true,
+    "VERBOSE":3,
+    "PHF_thrsh":0.00001,
+    "scan":0
+}

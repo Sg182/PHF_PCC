@@ -1,0 +1,12 @@
+{
+    "VERBOSE":2,
+    "use_MPI":false,
+    "NFC":0,
+    "NFV":0,
+    "NFO":0,
+    "fixgauge":true,
+    "chkpoint":false,
+    "is_RHF":false,
+    "nBroyVec":30,
+    "unit":"Bohr"
+}
