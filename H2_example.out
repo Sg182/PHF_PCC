@@ -1,0 +1,118 @@
+Reading and Checking Settings
+Control Settings:
+do_CC = False
+VERBOSE = 3
+unit = Ang
+orb_init = H2_6_31G_orb
+HamType = Mol
+NFC = 0
+NFV = 0
+NFO = 0
+is_RHF = False
+chkpoint = False
+read_PHF = False
+read_PCC = False
+refine_PHF = False
+use_MPI = False
+fixgauge = True
+SP = 2
+PG = None
+Irrep = Ag
+nx = 0
+ny = 0
+kx = 1
+ky = 1
+CmplxConj = 0
+nBroyVec = 30
+PHF_maxiter = 100
+PHF_thrsh = 1e-05
+DIIS = True
+scan = 0
+geom_file = H2.xyz
+basis = ['6-31G', 'cc-pvdz']
+mol_name = H2
+ngrid = [1, 10]
+M = 0
+J = 0
+Settings are Established and Valid
+FC ENuc= 0.35278480728
+E and max |G| -1.0461405680030265 0.0 0.027068619543350145 0.0
+E and max |G| -1.0507745525368322 0.0 0.019228237475353797 0.0
+E and max |G| -1.052755996393689 0.0 0.01485881395951294 0.0
+E and max |G| -1.0534355666000847 0.0 0.003438835681127461 0.0
+E and max |G| -1.0534776578449856 0.0 0.0013324679129037011 0.0
+E and max |G| -1.0534905118373958 0.0 0.0005157575128602009 0.0
+E and max |G| -1.002598042358787 0.0 0.13210642182285526 0.0
+E and max |G| -1.0409295913680368 0.0 0.05069175379799237 0.0
+E and max |G| -1.04859671325367 0.0 0.027464263580653014 0.0
+E and max |G| -1.0525595062619224 0.0 0.013830744300064427 0.0
+E and max |G| -1.0532580656299733 0.0 0.008861273177786512 0.0
+E and max |G| -1.0534629193907228 0.0 0.0024854425894431094 0.0
+E and max |G| -1.0534889623633412 0.0 0.001340966175470449 0.0
+E and max |G| -1.0534915335107875 0.0 0.00042546423093261555 0.0
+                    message: ['requested number of basinhopping iterations completed successfully']
+                    success: True
+                        fun: -1.4062763407907874
+                          x: [-7.214e-02  1.898e-01 ... -4.518e-02
+                               1.146e-01]
+                        nit: 1
+      minimization_failures: 0
+                       nfev: 14
+                       njev: 14
+ lowest_optimization_result:  message: Optimization terminated successfully.
+                              success: True
+                               status: 0
+                                  fun: -1.4062763407907874
+                                    x: [-7.214e-02  1.898e-01 ...
+                                        -4.518e-02  1.146e-01]
+                                  nit: 7
+                                  jac: [ 3.319e-05  0.000e+00 ...
+                                         0.000e+00  0.000e+00]
+                             hess_inv: [[ 1.759e+00  0.000e+00 ...
+                                          0.000e+00  0.000e+00]
+                                        [ 0.000e+00  1.000e+00 ...
+                                          0.000e+00  0.000e+00]
+                                        ...
+                                        [ 0.000e+00  0.000e+00 ...
+                                          1.000e+00  0.000e+00]
+                                        [ 0.000e+00  0.000e+00 ...
+                                          0.000e+00  1.000e+00]]
+                                 nfev: 8
+                                 njev: 8
+S and max |G| 0.7459766599790623 0.0
+CI Ene= [-1.05349153351079]
+Using DIIS to get PHF orbitals
+Initial PHF energy and error: -1.053491533510788 0.0008660013801138703
+PHF opt step 1
+Current PHF energy and error: -1.0534918854971371 0.0003421355477324923
+PHF opt step 2
+Current PHF energy and error: -1.0534919869354071 6.983915423851464e-05
+PHF opt step 3
+Current PHF energy and error: -1.0534920314991614 7.290854616652471e-06
+S and max |G| 0.7457974882334033 0.0
+GHF S^2, Sxyz= (0.7457974882334033+0j) (np.complex128(0j), np.complex128(-7.730361489821647e-17+0j), np.complex128(-7.730361489821647e-17+0j))
+PHF time= 0.03882002830505371
+occ ovlp= [0.99886074039438 0.99397447048733]
+vir ovlp= [0.96299349214505 0.96274367975941 0.00000000945753 0.               0.               0.               0.00000000011642 0.00000000192708]
+vir ovlp= [0.96299349214505 0.96274367975941]
+FC ENuc= 0.35278480728
+Using DIIS to get PHF orbitals
+Initial PHF energy and error: -1.0553113483896228 0.05103801690527371
+PHF opt step 1
+Current PHF energy and error: -1.056077977021946 0.0060323094665118895
+PHF opt step 2
+Current PHF energy and error: -1.0561076735476855 0.0025699017923942057
+PHF opt step 3
+Current PHF energy and error: -1.056123575797561 0.00020002815662236397
+PHF opt step 4
+Current PHF energy and error: -1.056125378556128 4.6165405989807686e-05
+PHF opt step 5
+Current PHF energy and error: -1.0561253819835008 2.5687723879644598e-05
+PHF opt step 6
+Current PHF energy and error: -1.0561253824805887 1.2698764674173534e-05
+PHF opt step 7
+Current PHF energy and error: -1.0561253826041326 3.3565846964794017e-06
+S and max |G| 0.7392283914254744 0.0
+GHF S^2, Sxyz= (0.7392283914254743+0j) (np.complex128(0j), np.complex128(1.8971166326244016e-16+0j), np.complex128(1.8971166326244016e-16+0j))
+PHF time= 0.13548660278320312
+E(PHF)= -1.056125382645117

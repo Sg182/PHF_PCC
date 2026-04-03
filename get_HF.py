@@ -193,7 +193,7 @@ def init_guess_FMO(mol, frags, spins, parity, HF_type="RHF"):
 
         C = HF.mo_coeff
 
-        if True:
+        if False:
             # UCCSD
             from pyscf import cc
             mfcc = cc.CCSD(HF)
@@ -586,7 +586,7 @@ def param(name):
 
 
 def driver():
-    name = "N2"
+    name = "H2"
     save_file, geom_file, basis, unit, frags, spins, parity = param(name)
     mol = make_mol(geom_file, basis, unit=unit)
     # D = init_guess_VB(mol, HF_type="UHF")

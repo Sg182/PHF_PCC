@@ -1,0 +1,21 @@
+This code performs the PHF and PCC optimization for molecules and Hubbard
+lattices, run through the driver function below. This code contains
+contributions from Carlos Jimenez-Hoyos, Yiheng Qiu, Tom Henderson, Ruiheng
+Song, and Jeff Keyes.
+
+To run first compile the PHF code by going into the PHF_fort dir
+and running
+ > bash makefile 
+There is a MPI and no_MPI version that decides whether to use MPI
+parallelization. Both use openmp. Running the makefile will produce a file
+called PHF_Tools_F.*.so where * is replaced by details of your python version.
+Move this file to the main directory.  A similar process can be done for the
+PCC code in SUCCSD_Boson_Cmplx.
+
+To run the code, set up an .xyz file for you geometry and a .json file
+containing details of the calculation. Information on these settings can be
+found in the PCC_objects.py file. An example for H2 is given. Finally, run the
+code as:
+ > python PCC_driver.py -s H2.json
+The output should look like H2_example.out
+Be sure to set the OMP_NUM_THREADS environmental variable for parallelization
