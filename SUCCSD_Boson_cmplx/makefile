@@ -13,7 +13,8 @@
  
 
 # No mpi version
-f2py --f90exec=gfortran --f77exec=gfortran --opt='-O3' --f90flags="-fopenmp" -lmkl_gf_lp64 -lmkl_core -lmkl_gnu_thread -lpthread -lgomp -m PUCC_X2_nompi -c Precision.f90 Constants.f90 Wrappers.f90 UHF.f90 IntTrans.f90 CCRes.f90 PCCCI.f90 CCSD_T.f90 FPUCC_Tools.f90 FPUCC_nompi.f90 Update_nompi.f90 DIIS.f90 Broyden_nompi.f90 Spin_nompi.f90 Main_nompi.f90 -I/home/jk220/Documents/PHF_PCC/SUCCSD_Boson_cmplx/ 
+# gfortran -O3 -fopenmp -lmkl_gf_lp64 -lmkl_core -lmkl_gnu_thread -lpthread -lgomp -c Precision.f90 Constants.f90 Wrappers.f90 UHF.f90 IntTrans.f90 CCRes.f90 PCCCI.f90 CCSD_T.f90 FPUCC_Tools.f90 FPUCC_nompi.f90 Update_nompi.f90 DIIS.f90 Linear_PCC.f90 Broyden_nompi.f90 Spin_nompi.f90 Main_nompi.f90 -I/home/jk220/Documents/PHF_PCC/SUCCSD_Boson_cmplx/ 
+f2py --f90exec=gfortran --f77exec=gfortran --opt='-O3' --f90flags="-fopenmp" -lmkl_gf_lp64 -lmkl_core -lmkl_gnu_thread -lpthread -lgomp -m PUCC_X2_nompi -c Precision.f90 Constants.f90 Wrappers.f90 UHF.f90 IntTrans.f90 CCRes.f90 PCCCI.f90 CCSD_T.f90 FPUCC_Tools.f90 FPUCC_nompi.f90 Update_nompi.f90 DIIS.f90 Linear_PCC.f90 Broyden_nompi.f90 Spin_nompi.f90 Main_nompi.f90 -I/home/jk220/Documents/PHF_PCC/SUCCSD_Boson_cmplx/ 
 
 # export FC=""
 # export CC="gcc"

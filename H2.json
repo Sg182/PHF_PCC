@@ -1,9 +1,9 @@
 {
     "mol_name":"H2",
-    "do_CC":false,
+    "do_CC":true,
     "geom_file":"H2.xyz",
     "orb_init":"H2_6_31G_orb",
-    "basis":["6-31G","cc-pvdz"],
+    "basis":["6-31G"],
     "SP":2,
     "ngrid":[1,10],
     "PG":"None",

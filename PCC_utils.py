@@ -463,9 +463,10 @@ def SortOrb(MO, NAO, NOccAO, NSO, NOccSO, Type):
     # rearrange orbitals from OA VA  0  0 to OA  0 VA  0
     #                          0  0 OB VB     0 OB  0 VB
     # if type = 0, do the inverse
+    temp = MO.dtype.str
     if Type == 1:
         NVrtAO = NAO - NOccAO
-        newMO = np.zeros([NSO, NSO])
+        newMO = np.zeros([NSO, NSO],dtype=temp)
         newMO[:, :NOccAO] = MO[:, :NOccAO]
         newMO[:, NOccAO:NOccSO] = MO[:, NAO : NAO + NOccAO]
         newMO[:, NOccSO : NOccSO + NVrtAO] = MO[:, NOccAO : NOccAO + NVrtAO]
@@ -473,7 +474,7 @@ def SortOrb(MO, NAO, NOccAO, NSO, NOccSO, Type):
         return newMO
     elif Type == 0:
         NVrtA = NAO - NOccAO
-        newMO = np.zeros([NSO, NSO])
+        newMO = np.zeros([NSO, NSO],dtype=temp)
         newMO[:, :NOccAO] = MO[:, :NOccAO]
         newMO[:, NOccAO:NAO] = MO[:, NOccSO : NOccSO + NVrtA]
         newMO[:, NAO : NAO + NOccAO] = MO[:, NOccAO:NOccSO]

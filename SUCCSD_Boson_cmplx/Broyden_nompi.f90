@@ -7,6 +7,7 @@
     Use FPUCC_nompi
     Use FPUCC_Tools
     Use DIIS
+    Use Linear_PCC
 !   Use InvSy
     Implicit None
     Private
@@ -89,6 +90,9 @@
     ! timer
     Integer         :: cnt1, cnt2, clock_rate, clock_max
     Real (Kind=pr)  :: cput1, cput2
+
+    !LPCC
+    Logical                          :: DoLPCC = .true.
     ! Set things up 
     Write(*,*) "Enter Broyden"
     DoCCD = DoCCDIn
@@ -173,8 +177,12 @@
     Do While(dT >= TolMax)
       NIter = NIter + 1
       Call BroydenStep(xnew,xold,fold,mix,w0,w,dF,dx,NIter)
-      Call EvalF(xnew,fnew,HTwo,NSO)
-      Call BuildSRes(fnew)
+      if (doLPCC .eqv. .False.) then
+        Call EvalF(xnew,fnew,HTwo,NSO)
+        Call BuildSRes(fnew)
+      else
+        Call EvalF_Linear(xnew,fnew,HTwo,NSO)
+      endif
 
       print *, "feufeue", NIter, norm2(real(fnew)), norm2(zabs(fnew))
       ! if (norm2(real(fnew)) < getDIIS) then
@@ -488,6 +496,22 @@
     If(IAlloc /= 0) Stop "Could not deallocate in EvalF"
     Return
     End Subroutine EvalF
+
+    Subroutine EvalF_Linear(x,fx,HTwo,NSO)
+    Implicit None
+    Complex (Kind=pr),   Intent(In)  :: x(nBrd)
+    Integer,             Intent(In)  :: NSO
+    Complex (Kind=pr),   Intent(In)  :: HTwo(NSO,NSO,NSO,NSO)
+    Complex (Kind=pr),   Intent(Out) :: fx(nBrd)
+    Complex (Kind=pr)                :: Ene
+
+    Call LPCC_drive(fx,Ene,x,HOneBrd,HTwo,NOccBrd,NAOBrd,NSOBrd,ENucBrd,QJBrd, SPBrd, &
+                        NPointsBrd, NpgBrd, ncispBrd, ncipgBrd, ncikBrd, R1Brd, &
+                        R2Brd, RpgBrd, RkBrd, RootaBrd,RootbBrd,RootyBrd, &
+                        WeightspBrd,WeightpgBrd,fspBrd,fpgBrd,fkBrd)
+    EneBrd = Ene
+    Return
+    End Subroutine EvalF_Linear
 
     Subroutine BroydenStep(xnew,xold,fold,mix,w0,w,dF,dx,NIter)
     Implicit None

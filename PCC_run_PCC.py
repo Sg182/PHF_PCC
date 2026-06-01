@@ -274,7 +274,7 @@ def run_PCC(settings, Values, step=0, convert=False, read_PCC=None, write_PCC=No
     # print(PCC[3])
     if write_PCC and Values.rank == 0:
         pickle.dump(
-            [Values.PCC[0], Values.PCC[1], Values.PCC[2], Values.PCC[3]],
+            [Values.PCC[0], Values.PCC[1], Values.PCC[2], Values.PCC[3], Values.semi_MO],
             open(f"{write_PCC}", "wb"),
         )
 

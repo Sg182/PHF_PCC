@@ -36,6 +36,7 @@ from PCC_utils import (
     calcS,
     calcS2,
     FrozenCore,
+    SortOrb,
 )
 
 """
@@ -283,6 +284,77 @@ def run_PHF(settings, Values, step=0, write_OAO=None, read_PHF=None, write_PHF=N
             open(f"{read_PHF}", "rb")
         )
 
+        if False and Values.rank == 0:
+            "Write orbitals for FCI PCC code"
+            HOne = np.zeros([Values.NSO, Values.NSO])
+            HTwo = np.zeros([Values.NSO, Values.NSO, Values.NSO, Values.NSO])
+            HOne[: Values.NAO, : Values.NAO] = Values.h1[:, :]
+            HOne[Values.NAO :, Values.NAO :] = Values.h1[:, :]
+            HTwo[: Values.NAO, : Values.NAO, : Values.NAO, : Values.NAO] = Values.eri[
+                :, :, :, :
+            ]
+            HTwo[Values.NAO :, Values.NAO :, Values.NAO :, Values.NAO :] = Values.eri[
+                :, :, :, :
+            ]
+            HTwo[Values.NAO :, Values.NAO :, : Values.NAO, : Values.NAO] = Values.eri[
+                :, :, :, :
+            ]
+            HTwo[: Values.NAO, : Values.NAO, Values.NAO :, Values.NAO :] = Values.eri[
+                :, :, :, :
+            ]
+            HTwo = Mulliken2Dirac(HTwo)
+            OrthAO = np.eye(Values.NAO)
+            Xinv = np.linalg.inv(OrthAO)
+            X = block_diag(OrthAO, OrthAO)
+            Xinv = block_diag(Xinv, Xinv)
+            C = SemiCanon(HOne, HTwo, Values.SGHFMO, Values.NOccSO, settings.SP)
+            C = SortOrb(C,Values.NAO,Values.NOccAO,Values.NSO,Values.NOccSO,0)
+            Ca = C[:Values.NAO,:Values.NAO]
+            Cb = C[Values.NAO:,Values.NAO:]
+            S = Ca.conj().T.dot(Cb)
+            print (S)
+            print(Values.Enuc)
+
+            UHF = pyscf.scf.UHF(Values.mol)
+            UHF.get_hcore = lambda *args: Values.h1
+            UHF.get_ovlp = lambda *args: Values.Ovlp
+            UHF._eri = pyscf.ao2mo.restore(8, Values.eri, Values.NAO)
+            UHF.max_cycle = -1
+            print(UHF.spin_square([Ca[:,:Values.NOccAO],Cb[:,:Values.NOccAO]],np.eye(Values.NAO)))
+            dm1 = np.dot(
+                Ca[:, : Values.NOccAO], Ca[:, : Values.NOccAO].T
+            )
+            dm2 = np.dot(
+                Cb[:, : Values.NOccAO], Cb[:, : Values.NOccAO].T
+            )
+            dm = np.array([dm1, dm2])
+            print(UHF.energy_tot(dm=dm) - Values.Enuc)
+            # UHF.kernel(dm)
+
+            h1a = np.einsum("pq,pi,qj->ij",Values.h1,Ca.conj(),Ca)
+            h1b = np.einsum("pq,pi,qj->ij",Values.h1,Cb.conj(),Cb)
+            h1_ = np.zeros((Values.NSO,Values.NSO),dtype=complex)
+            h1_[::2,::2] = h1a
+            h1_[1::2,1::2] = h1b
+
+            h2 = Values.eri.transpose(0,2,1,3)
+            h2 /= 2.0
+            h2aa = np.einsum("pqrs,pi,qj,rk,sl->ijkl",h2,Ca.conj(),Ca.conj(),Ca,Ca)
+            h2bb = np.einsum("pqrs,pi,qj,rk,sl->ijkl",h2,Cb.conj(),Cb.conj(),Cb,Cb)
+            h2ab = np.einsum("pqrs,pi,qj,rk,sl->ijkl",h2,Ca.conj(),Cb.conj(),Ca,Cb)
+            h2_ = np.zeros((Values.NSO,Values.NSO,Values.NSO,Values.NSO),dtype=complex)
+            h2_[::2,::2,::2,::2] = h2aa
+            h2_[1::2,1::2,1::2,1::2] = h2bb
+            h2_[1::2,::2,1::2,::2] = h2ab.transpose(1,0,3,2)
+            h2_[::2,1::2,::2,1::2] = h2ab
+
+            # h2_ *= 0
+            # h1_ *= 0
+
+            h1_.flatten(order="F").tofile(f"../FCI/{settings.mol_name}_h1.bin")
+            h2_.flatten(order="F").tofile(f"../FCI/{settings.mol_name}_h2.bin")
+            S.flatten(order="F").tofile(f"../FCI/{settings.mol_name}_S.bin")
+
         if settings.refine_PHF:
             HOne = np.zeros([Values.NSO, Values.NSO])
             HTwo = np.zeros([Values.NSO, Values.NSO, Values.NSO, Values.NSO])
@@ -357,6 +429,12 @@ def run_PHF(settings, Values, step=0, write_OAO=None, read_PHF=None, write_PHF=N
                         optPHF_SCF(HOne, HTwo, Values.SGHFMO, settings, Values)
                     )
             else:
+                if True:
+                    # z0, Olap = get_ref(settings, Values, sci=True)
+
+                    Values.EPHF, Values.SGHFMO, Values.fsp, Values.fpg, Values.fk = optPHF(
+                        HOne, HTwo, Values.SGHFMO, settings, Values, 1, z0=None
+                    )
                 if settings.DIIS == True:
                     Values.EPHF, Values.SGHFMO, Values.fsp, Values.fpg, Values.fk = (
                         optPHF_DIIS(HOne, HTwo, Values.SGHFMO, settings, Values)
@@ -1238,7 +1316,7 @@ def optPHF(HOne, HTwo, MOs, settings, Values, i, z0=None):
             "method": "BFGS",
             "jac": True,
             "args": (H1, H2, MOs, settings, Values, phftools),
-            "options": {"gtol": 1e-3},
+            "options": {"gtol": 1e-5},
         }
         res = basinhopping(
             EandG, z0, minimizer_kwargs=minimizer_kwargs, niter=1, T=0.2, stepsize=0.2
@@ -1250,7 +1328,7 @@ def optPHF(HOne, HTwo, MOs, settings, Values, i, z0=None):
             method="BFGS",
             args=(H1, H2, MOs, settings, Values, phftools),
             jac=True,
-            options={"gtol": 1.0e-6},
+            options={"gtol": 1.0e-3},
         )
     #   cons = ({'type':'eq','fun': lambda x: SxCons(x,MOs), 'jac': lambda x: SxConsGrad(x,MOs)})
     ##    {'type':'eq','fun': lambda x: SyCons(x,MOs), 'jac': lambda x: SyConsGrad(x,MOs)})

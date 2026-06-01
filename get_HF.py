@@ -193,7 +193,7 @@ def init_guess_FMO(mol, frags, spins, parity, HF_type="RHF"):
 
         C = HF.mo_coeff
 
-        if False:
+        if True:
             # UCCSD
             from pyscf import cc
             mfcc = cc.CCSD(HF)
@@ -495,7 +495,7 @@ def param(name):
     if name == "N2":
         save_file = "N2_6_31G_orb"
         geom_file = "N2.xyz"
-        basis = "cc-pvdz"
+        basis = "6-31G"
         unit = "Ang"
         frags = [[0], [1]]
         spins = [3, 3]
