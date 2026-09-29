@@ -1,7 +1,5 @@
 This code performs the PHF and PCC optimization for molecules and Hubbard
-lattices, run through the driver function below. This code contains
-contributions from Carlos Jimenez-Hoyos, Yiheng Qiu, Tom Henderson, Ruiheng
-Song, and Jeff Keyes.
+lattices, run through the driver function below.
 
 To run first compile the PHF code by going into the PHF_fort dir
 and running
