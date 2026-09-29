@@ -169,6 +169,32 @@ def prepare_orbs(settings, Values):
         S[:n, :o] = Values.OAO.T.dot(ovlp)
         S[n:, o:] = Values.OAO.T.dot(ovlp)
         Values.A2G = S.dot(C)
+        "orb_init must be orthonormal (the kernel uses it as a unitary reference; a non-unitary one"
+        "breaks [H, R] = 0 in the MO representation -> non-Hermitian projected H, wrong SGHF gradient)."
+        "Check, Lowdin-orthonormalise a recoverable input (warn if the correction is appreciable),"
+        "reject a rank-deficient one."
+        A = Values.A2G; no = Values.NOccSO
+        dev_in = float(np.abs(A.conj().T @ A - np.eye(A.shape[1])).max())
+        w_occ = np.linalg.eigvalsh(A[:, :no].conj().T @ A[:, :no])
+        if w_occ.min() < 1e-8 * max(w_occ.max(), 1e-300):
+            raise ValueError(f"orb_init rejected: occupied orbitals are (nearly) linearly dependent "
+                             f"(Gram eigenvalues {w_occ.min():.2e} .. {w_occ.max():.2e})")
+        occ = A[:, :no]; w, v = np.linalg.eigh(occ.conj().T @ occ)
+        occ = occ @ v @ np.diag(w ** -0.5) @ v.conj().T
+        vir = A[:, no:] - occ @ (occ.conj().T @ A[:, no:])        # project out the occupied space
+        w_vir = np.linalg.eigvalsh(vir.conj().T @ vir)
+        if vir.shape[1] > 0 and w_vir.min() < 1e-8 * max(w_vir.max(), 1e-300):
+            raise ValueError(f"orb_init rejected: virtual orbitals are (nearly) linearly dependent after "
+                             f"projection on the occupied space (Gram eigenvalues {w_vir.min():.2e} .. {w_vir.max():.2e})")
+        w, v = np.linalg.eigh(vir.conj().T @ vir)
+        vir = vir @ v @ np.diag(w ** -0.5) @ v.conj().T
+        Values.A2G = np.hstack((occ, vir))
+        dev_out = float(np.abs(Values.A2G.conj().T @ Values.A2G - np.eye(A.shape[1])).max())
+        if dev_in > 1e-6:
+            print(f"WARNING: orb_init was not orthonormal (max|C^H C - 1| = {dev_in:.2e}); Lowdin-orthonormalised "
+                  f"(now {dev_out:.1e}). The occupied span was kept; check that the seed is what you intended.")
+        elif settings.VERBOSE > 1:
+            print(f"orb_init: orthonormality deviation {dev_in:.1e} (ok)")
 
     return Values
 

@@ -6,6 +6,13 @@ import os
 import copy
 from scipy.linalg import block_diag
 from scipy.optimize import minimize, basinhopping
+try:
+    from ipopt import minimize_ipopt          # cyipopt <= 0.2 exposes it as `ipopt`
+except ImportError:
+    try:
+        from cyipopt import minimize_ipopt    # cyipopt >= 1.0
+    except ImportError:
+        minimize_ipopt = None
 import pyscf
 import PCC_orbs
 
@@ -1286,6 +1293,102 @@ def build_F(H1, H2, den, settings, Values):
     return F, E0, fsp, fpg, fk
 
 
+ZBOUND = 5.0   # bound on Thouless parameters for IPOPT; secondary protection only (validation is primary)
+
+
+def phf_policy(settings):
+    """Optimizer policy -> (use_ipopt, number of basin hops).  See PHF_opt in PCC_objects."""
+    if settings.PHF_opt == "ipopt":
+        return True, settings.PHF_basinhop
+    if settings.PHF_opt == "bfgs":
+        return False, settings.PHF_basinhop
+    if settings.SP == 2:                                   # auto: SUHF -> IPOPT
+        return True, settings.PHF_basinhop
+    if settings.SP == 1:                                   # auto: SGHF -> BFGS + >= 3 hops (robust mode)
+        return False, max(settings.PHF_basinhop, 3)
+    return False, settings.PHF_basinhop
+
+
+def collinear_reference(MOs, Values, tol=1e-8):
+    """True if every occupied orbital of the reference is pure alpha or pure beta (Sz eigenstate)."""
+    occ = MOs[:, : Values.NOccSO]
+    na = np.sum(np.abs(occ[: Values.NAO]) ** 2, axis=0)
+    nb = np.sum(np.abs(occ[Values.NAO :]) ** 2, axis=0)
+    return bool(np.all(np.minimum(na, nb) < tol))
+
+
+def sghf_initial_kick(z0, settings, Values, MOs):
+    """SP = 1: if the reference is collinear, perturb the spin-flip block of z0 deterministically so the
+    optimization never starts exactly on the collinear (Sz-symmetric) stationary manifold.
+    Returns (z0, kicked)."""
+    if settings.SP != 1 or settings.PHF_sghf_kick <= 0 or not collinear_reference(MOs, Values):
+        return z0, False
+    nv, no = Values.NVrtSO, Values.NOccSO
+    flip = ((np.arange(nv)[:, None] < Values.NVrtA) != (np.arange(no)[None, :] < Values.NOccA)).reshape(-1)
+    idx = np.where(flip)[0]                                # real parts of the spin-flip block
+    rng = np.random.default_rng(20260928)                  # fixed seed: reproducible
+    z = np.array(z0, dtype=float, copy=True)
+    z[idx] += settings.PHF_sghf_kick * rng.standard_normal(len(idx))
+    return z, True
+
+
+def phf_optimize(z0, eg_args, settings, Values, use_ipopt, nhop, gtol):
+    """Run the local optimizer (IPOPT or BFGS), optionally inside scipy basinhopping."""
+    if use_ipopt:
+        if minimize_ipopt is None:
+            raise ImportError('PHF_opt = "ipopt" but cyipopt is not installed; use PHF_opt = "bfgs"')
+        ipopt_opts = {
+            "tol": gtol,
+            "max_iter": 50 * settings.PHF_maxiter,
+            "mu_strategy": "adaptive",
+            "nlp_scaling_method": "none",
+            "hessian_approximation": "limited-memory",
+            "print_level": 5 if settings.VERBOSE > 2 else 0,
+        }
+
+        def local_min(fun, x0, args=(), jac=None, **unused):
+            "IPOPT as a scipy-compatible local minimizer; scipy.minimize passes fun (scalar) and jac separately"
+            return minimize_ipopt(fun, x0, jac=(jac if callable(jac) else True), args=args,
+                                  bounds=[(-ZBOUND, ZBOUND)] * len(x0), options=ipopt_opts)
+        minimizer_kwargs = {"method": local_min, "jac": True, "args": eg_args}
+    else:
+        minimizer_kwargs = {"method": "BFGS", "jac": True, "args": eg_args, "options": {"gtol": gtol}}
+    if nhop > 0:
+        return basinhopping(EandG, z0, minimizer_kwargs=minimizer_kwargs, niter=nhop,
+                            T=settings.PHF_hop_T, stepsize=settings.PHF_hop_step)
+    return minimize(EandG, z0, **minimizer_kwargs)
+
+
+def validate_phf_result(res, E_start, eg_args, gtol, label, Enuc, verbose=1):
+    """Independent post-solve validation of ANY optimizer result.  Recomputes E and G with EandG and
+    requires: finite parameters, energy and gradient; max|G| <= 10*gtol; energy not above the
+    starting energy; parameters inside the bound.  Raises RuntimeError otherwise.  The optimizer's
+    own success/status flag is deliberately not used.  Returns (E_fin, gmax)."""
+    x = np.asarray(res.x, dtype=float)
+    problems = []
+    E_fin, gmax, zmax = float("nan"), float("nan"), float(np.max(np.abs(x))) if x.size else 0.0
+    if not np.all(np.isfinite(x)):
+        problems.append("nonfinite parameters")
+    else:
+        E_fin, G_fin = EandG(x, *eg_args)
+        gmax = float(np.max(np.abs(G_fin)))
+        if not (np.isfinite(E_fin) and np.all(np.isfinite(G_fin))):
+            problems.append("nonfinite energy or gradient")
+        else:
+            if E_fin > E_start + 1e-10:
+                problems.append(f"energy rose: start {E_start + Enuc:.10f} -> final {E_fin + Enuc:.10f}")
+            if gmax > 10.0 * gtol:
+                problems.append(f"max|G| = {gmax:.2e} > 10 * tolerance {10*gtol:.1e}")
+        if zmax > 0.99 * ZBOUND:
+            problems.append(f"parameters diverged: max|z| = {zmax:.3f} (bound {ZBOUND})")
+    if verbose > 0:
+        print(f"PHF optimizer: {label}: E = {E_fin + Enuc:.10f}, max|G| = {gmax:.2e}, max|z| = {zmax:.3f}, "
+              f"nfev = {getattr(res, 'nfev', '?')}")
+    if problems:
+        raise RuntimeError(f"PHF result ({label}) rejected by post-solve validation: " + "; ".join(problems))
+    return E_fin, gmax
+
+
 def optPHF(HOne, HTwo, MOs, settings, Values, i, z0=None):
     "Run the PHF optimization using direct minimization of orbitals"
 
@@ -1311,28 +1414,20 @@ def optPHF(HOne, HTwo, MOs, settings, Values, i, z0=None):
         # else:
         z0 = np.zeros(2 * (Values.NSO - Values.NOccSO) * Values.NOccSO)
 
+    eg_args = (H1, H2, MOs, settings, Values, phftools)
     if i == 0:
-        minimizer_kwargs = {
-            "method": "BFGS",
-            "jac": True,
-            "args": (H1, H2, MOs, settings, Values, phftools),
-            "options": {"gtol": 1e-5},
-        }
-        res = basinhopping(
-            EandG, z0, minimizer_kwargs=minimizer_kwargs, niter=1, T=0.2, stepsize=0.2
-        )
+        use_ipopt, nhop = phf_policy(settings)
+        gtol = settings.PHF_ipopt_tol if use_ipopt else settings.PHF_bfgs_gtol
+        z0, kicked = sghf_initial_kick(z0, settings, Values, MOs)
+        if kicked and settings.VERBOSE > 0:
+            print(f"SGHF: collinear reference detected -> spin-flip kick of {settings.PHF_sghf_kick:.1e} applied to z0")
+        label = ("IPOPT" if use_ipopt else "BFGS") + (f" + {nhop} basin hop(s)" if nhop > 0 else "")
     else:
-        res = minimize(
-            EandG,
-            z0,
-            method="BFGS",
-            args=(H1, H2, MOs, settings, Values, phftools),
-            jac=True,
-            options={"gtol": 1.0e-3},
-        )
-    #   cons = ({'type':'eq','fun': lambda x: SxCons(x,MOs), 'jac': lambda x: SxConsGrad(x,MOs)})
-    ##    {'type':'eq','fun': lambda x: SyCons(x,MOs), 'jac': lambda x: SyConsGrad(x,MOs)})
-    #   res = minimize_ipopt(EandG, z0, args=(H1,H2,MOs,comm), jac=True, constraints=cons, tol=5e-5)
+        use_ipopt, nhop, gtol, label = False, 0, 1.0e-3, "BFGS (basis up-conversion)"
+    E_start = EandG(z0, *eg_args)[0]
+    res = phf_optimize(z0, eg_args, settings, Values, use_ipopt, nhop, gtol)
+    validate_phf_result(res, E_start, eg_args, gtol, label, Values.Enuc, settings.VERBOSE)
+    res.success = True          # validation above is the authority, not the optimizer's own flag
     if settings.VERBOSE > 1:
         print(res)
     if res.success == False:
@@ -1549,7 +1644,11 @@ def EandG(Z, *args):
             # file=output,
         )
     # output.close()
-    return E0.real, np.concatenate((G.real, G.imag))
+    # G = dE/dz* (Wirtinger); for the real parameters x = Re z, y = Im z of a real E:
+    # dE/dx = 2 Re G, dE/dy = 2 Im G.  (Without the 2 the gradient is half the true one --
+    # harmless for scipy BFGS, but it makes IPOPT's line search fail; verified with
+    # IPOPT's derivative checker: analytic/FD = 0.5000 on every component.)
+    return E0.real, 2.0 * np.concatenate((G.real, G.imag))
 
 
 def SzCons(Z, MO):

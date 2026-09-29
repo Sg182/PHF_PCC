@@ -113,6 +113,43 @@ class settings:
             Max number of iterations in SCF or DIIS optimization of PHF orbitals
         PHF_thrsh : float
             Convergence toloerance in SCF(energy) or DIIS(error) optimization of PHF orbitals
+        PHF_opt : str
+            Local optimizer for the direct (Thouless-parameter) PHF minimization in optPHF.
+            Production policy (validated 2026-09-28 on N2 and square H4, cc-pVDZ):
+                "auto" (default): SP = 2 (SUHF)  -> IPOPT, PHF_basinhop hops (default 1)
+                                  SP = 1 (SGHF)  -> BFGS + basin hopping with max(PHF_basinhop, 3) hops
+                                  other SP       -> BFGS + PHF_basinhop hops
+                "ipopt"         : IPOPT (cyipopt, L-BFGS Hessian, bounds +/-5 on z) as the local
+                                  optimizer for any SP -- deterministic when PHF_basinhop = 0;
+                                  for SGHF it is a validation/local option, not the default global
+                                  search (for the tested H4 seeds it stayed in a higher basin unless
+                                  >= 3 hops were used)
+                "bfgs"          : scipy BFGS (gtol = PHF_bfgs_gtol) + PHF_basinhop hops
+            Every optimizer result is validated independently (recomputed E and G): finite
+            parameters/energy/gradient, max|G| <= 10 * (PHF_ipopt_tol | PHF_bfgs_gtol), energy not
+            above the starting energy, |z| below the bound.  The optimizer's own success flag is
+            never trusted by itself; a failed validation raises RuntimeError.
+        PHF_bfgs_gtol : float
+            BFGS gradient tolerance (scipy gtol, max|dE/dz|), default 1e-5
+        PHF_sghf_kick : float
+            SP = 1 only: if the reference determinant is collinear (every occupied orbital pure
+            alpha or beta), a deterministic perturbation of this size is applied to the spin-flip
+            block of the initial Thouless parameters before optimization.  Reason: a collinear
+            determinant is an Sz eigenstate and therefore a stationary point of the projected
+            energy in all spin-flip directions, and the finite-difference behaviour of the
+            gradient exactly there (with CmplxConj = 1) is not validated.  Production SGHF must
+            always start off the collinear manifold; 0 disables the kick (not recommended).
+        PHF_ipopt_tol : float
+            IPOPT convergence tolerance (unscaled dual infeasibility = max|dE/dz|) for IPOPT
+        PHF_basinhop : int
+            Number of scipy basin-hopping restarts wrapped around the local minimizer selected by
+            PHF_opt (random displacement of the Thouless parameters, then re-minimize, Metropolis
+            accept).  0 = a single local minimization from the seed (deterministic).  Default 1
+            (the legacy behaviour for BFGS).  Works with both "bfgs" and "ipopt".
+        PHF_hop_step : float
+            Basin-hopping displacement size (default 0.2)
+        PHF_hop_T : float
+            Basin-hopping Metropolis temperature in Hartree (default 0.2)
 
         PCC Settings
         ------------------------------------------
@@ -169,6 +206,13 @@ class settings:
             ("nBroyVec", int),
             ("PHF_maxiter", int),
             ("PHF_thrsh", float),
+            ("PHF_opt", str),
+            ("PHF_ipopt_tol", float),
+            ("PHF_bfgs_gtol", float),
+            ("PHF_sghf_kick", float),
+            ("PHF_basinhop", int),
+            ("PHF_hop_step", float),
+            ("PHF_hop_T", float),
             ("DIIS", bool),
             ("scan", int),
         ]
@@ -202,6 +246,13 @@ class settings:
         setattr(self, "nBroyVec", 30),
         setattr(self, "PHF_maxiter", 100),
         setattr(self, "PHF_thrsh", 1.e-4),
+        setattr(self, "PHF_opt", "auto"),
+        setattr(self, "PHF_ipopt_tol", 1.e-6),
+        setattr(self, "PHF_bfgs_gtol", 1.e-5),
+        setattr(self, "PHF_sghf_kick", 1.e-2),
+        setattr(self, "PHF_basinhop", 1),
+        setattr(self, "PHF_hop_step", 0.2),
+        setattr(self, "PHF_hop_T", 0.2),
         setattr(self, "DIIS", True),
         setattr(self, "scan", 0),
 
@@ -307,6 +358,16 @@ class settings:
             raise ValueError("PHF_thrsh must be a positive number")
         if (self.PHF_maxiter < 1):
             raise ValueError("PHF_maxiter must be at least 1")
+        if self.PHF_opt not in ("auto", "ipopt", "bfgs"):
+            raise ValueError('PHF_opt must be "auto", "ipopt" or "bfgs"')
+        if (self.PHF_ipopt_tol <= 0) or (self.PHF_bfgs_gtol <= 0):
+            raise ValueError("PHF_ipopt_tol and PHF_bfgs_gtol must be positive numbers")
+        if (self.PHF_sghf_kick < 0):
+            raise ValueError("PHF_sghf_kick must be >= 0")
+        if (self.PHF_basinhop < 0):
+            raise ValueError("PHF_basinhop must be >= 0")
+        if (self.PHF_hop_step <= 0) or (self.PHF_hop_T <= 0):
+            raise ValueError("PHF_hop_step and PHF_hop_T must be positive")
 
         "Projection checks"
         if (self.SP < 0) or (self.SP > 3):
