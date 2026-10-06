@@ -1,0 +1,27 @@
+{
+    "mol_name": "N2G",
+    "geom_file": "N2_R2.5.xyz",
+    "unit": "Ang",
+    "basis": [
+        "6-31G"
+    ],
+    "orb_init": "N2_631G_R2.5_ghf_orb",
+    "do_CC": true,
+    "SP": 1,
+    "ngrid": [
+        14,
+        10
+    ],
+    "PG": "None",
+    "Irrep": "Ag",
+    "J": 0,
+    "M": 0,
+    "VERBOSE": 1,
+    "chkpoint": true,
+    "PHF_opt": "ipopt",
+    "PHF_basinhop": 0,
+    "read_PHF": true,
+    "read_PCC": false,
+    "PCC_cyc_max": 1000,
+    "PCC_merit": 0
+}
