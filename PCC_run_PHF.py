@@ -439,8 +439,17 @@ def run_PHF(settings, Values, step=0, write_OAO=None, read_PHF=None, write_PHF=N
                 if True:
                     # z0, Olap = get_ref(settings, Values, sci=True)
 
+                    "2026-10-04: pass the real basis index i, not the literal 1."
+                    "optPHF treats i > 0 as a basis up-conversion and then forces BFGS, 0 basin"
+                    "hops and gtol 1e-3 -- a deliberately loose PRE-optimization that is meant to be"
+                    "followed by a tight one in the final basis.  Passing 1 here applied that loose"
+                    "setting to every geometry of a scan, where it is the ONLY optimization performed,"
+                    "so steps 01.. of an SGHF scan were converged only to max|G| ~ 1e-3 and never saw"
+                    "phf_policy (BFGS + >= 3 hops for SP = 1) or the spin-flip kick.  With i (= 0 for a"
+                    "single-basis scan step) the documented policy applies at every geometry."
+                    Values.SGHFMO = orthonormalize_ref(Values.SGHFMO, Values.NOccSO, settings, step, i)
                     Values.EPHF, Values.SGHFMO, Values.fsp, Values.fpg, Values.fk = optPHF(
-                        HOne, HTwo, Values.SGHFMO, settings, Values, 1, z0=None
+                        HOne, HTwo, Values.SGHFMO, settings, Values, i, z0=None
                     )
                 if settings.DIIS == True:
                     Values.EPHF, Values.SGHFMO, Values.fsp, Values.fpg, Values.fk = (
@@ -452,6 +461,12 @@ def run_PHF(settings, Values, step=0, write_OAO=None, read_PHF=None, write_PHF=N
                     )
 
             t2 = time.time()
+            if settings.VERBOSE > 0:
+                "Unprojected energy of the optimised (VAP) reference determinant: <Phi|H|Phi> with the GHF-form integrals"
+                Cocc = Values.SGHFMO[:, : Values.NOccSO]; Dm = Cocc @ Cocc.conj().T
+                Edet = np.einsum("pq,qp->", HOne, Dm) + 0.5 * np.einsum("pqrs,rp,sq->", HTwo, Dm, Dm) + Values.Enuc
+                lab = {2: "UHF", 1: "GHF", 3: "UHF"}.get(settings.SP, "det")
+                print(f"E({lab} det, unprojected VAP reference)= {Edet.real:.14f}   E(PHF)= {Values.EPHF + Values.Enuc:.14f}")
             if settings.VERBOSE > 1:
                 GHFS = calcS(Values.SGHFMO, Values.NOccSO, Values.NAO)
                 GHFSS = calcS2(Values.SGHFMO, Values.NOccSO, Values.NAO)
@@ -1294,6 +1309,37 @@ def build_F(H1, H2, den, settings, Values):
 
 
 ZBOUND = 5.0   # bound on Thouless parameters for IPOPT; secondary protection only (validation is primary)
+
+
+def orthonormalize_ref(MOs, NOccSO, settings, step, i, tol=1.0e-10):
+    """Check, and if necessary restore, orthonormality of a warm-start determinant.
+
+    Between geometries the working one-particle basis (Values.OAO = the RHF orbitals at that
+    geometry, aligned to the previous step by MatchOrb) is rebuilt, and the previous step's
+    determinant is reinterpreted in it.  Both bases are orthonormal and MatchOrb is a unitary
+    (orthogonal-Procrustes) rotation, so C stays unitary in exact arithmetic; this guard catches
+    the cases where it does not -- accumulated round-off along a long chain, a rank-deficient
+    MatchOrb virtual block, or a determinant that came from a pickle written by another run.
+    Restoration is a Lowdin symmetric orthonormalization, which is the minimal change: it is the
+    unitary matrix closest to C in the Frobenius norm, so it perturbs the determinant as little
+    as possible while making it a legitimate starting point.
+    """
+    dev = float(np.abs(MOs.conj().T @ MOs - np.eye(MOs.shape[1])).max())
+    if dev <= tol:
+        if settings.VERBOSE > 1:
+            print(f"warm start (step {step}, basis {i}): reference orthonormal to {dev:.1e}")
+        return MOs
+    u, sv, vh = np.linalg.svd(MOs)
+    MOnew = u @ vh
+    dev2 = float(np.abs(MOnew.conj().T @ MOnew - np.eye(MOnew.shape[1])).max())
+    if settings.VERBOSE > 0:
+        print(f"warm start (step {step}, basis {i}): reference NOT orthonormal (max|C^dag C - 1| = {dev:.3e}); "
+              f"Lowdin-restored to {dev2:.1e}, singular values {sv.min():.6f}..{sv.max():.6f}, "
+              f"max|dC| {float(np.abs(MOnew - MOs).max()):.3e}")
+    if sv.min() < 1e-8:
+        raise ValueError(f"warm-start reference is rank deficient (smallest singular value {sv.min():.3e}); "
+                         "the determinant cannot be transferred to this geometry")
+    return MOnew
 
 
 def phf_policy(settings):
